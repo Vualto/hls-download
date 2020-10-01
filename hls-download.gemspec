@@ -10,7 +10,6 @@ Gem::Specification.new do |spec|
   spec.description   = %q{Download HLS streams}
   spec.homepage      = 'http://www.vualto.com'
   spec.license       = 'MIT'
-  spec.metadata['allowed_push_host'] = 'http://rubygems.drm.technology:9292'
 
   spec.files         = Dir['lib/**/*.rb'] + Dir['bin/*'] + Dir['[A-Z]*']
   spec.require_paths = ['lib']
