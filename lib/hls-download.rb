@@ -1,0 +1,2 @@
+require 'hls'
+require 'version'
