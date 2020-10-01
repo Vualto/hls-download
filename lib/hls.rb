@@ -23,7 +23,7 @@ module HLSDownload
     attr_accessor :sub_m3u8, :main_url, :media_files, :logger
 
     def initialize(url, logger = nil)
-      @logger ||= new_logger
+      @logger = logger || new_logger
       raise HLSException.new("invalid url '#{url}'") unless url.end_with? '.m3u8'
       @main_url = URI.parse(url)
       @media_files = []
@@ -31,11 +31,39 @@ module HLSDownload
       parse @main_url
     end
 
+    def download!(opts = {})
+      manifest_file = main_url.path.split('/').last
+      base_url = main_url.to_s.gsub("/#{manifest_file}", '')
+      @output_dir = opts[:output_dir] || 'out'
+      FileUtils.mkdir_p @output_dir
+      
+      download_file(main_url, File.join(@output_dir, 'manifest.m3u8'))
+      
+      sub_m3u8.each do | m3u8 |
+        output = m3u8.main_url.to_s.gsub(base_url, @output_dir)
+        download_file(m3u8.main_url, output)
+        m3u8.media_files.each do | file_url |
+          output = file_url.gsub(base_url, @output_dir)
+          download_file(URI.parse(file_url), output)
+        end
+      end
+
+      media_files.each do | file_url |
+        output = file_url.gsub(base_url, @output_dir)
+        download_file(URI.parse(file_url), output)
+      end
+    end
+
+    private
+
     def parse(url)
       man = http_get(url)
       logger.debug "parsing manifest"
       lines = man.split("\n")
+      
       unless man.include? '.m3u8'
+        # this is a variant playlist
+        raise HLSException.new('unsupported media playlist') unless is_media_playlist? man
         logger.debug 'getting media url(s)'
         files = lines.reject { |l| l.start_with? '#' }
         @media_files = files.map do |f|
@@ -50,8 +78,10 @@ module HLSDownload
           end
           f
         end
-        raise HLSException.new('unsupported media playlist') unless is_media_playlist? man
+        
+        return
       end
+      
       # this is a master playlist
       uris = lines.select { |l| l.include? '.m3u8' }.map do |l|
         if l.start_with? '#'
@@ -78,29 +108,6 @@ module HLSDownload
         end
         logger.debug "sub playlist found #{u}"
         sub_m3u8 << HLS.new(u)
-      end
-    end
-
-    def download!(opts = {})
-      manifest_file = main_url.path.split('/').last
-      base_url = main_url.to_s.gsub("/#{manifest_file}", '')
-      @output_dir = opts[:output_dir] || 'out'
-      FileUtils.mkdir_p @output_dir
-      
-      download_file(main_url, File.join(@output_dir, 'manifest.m3u8'))
-      
-      sub_m3u8.each do | m3u8 |
-        output = m3u8.main_url.to_s.gsub(base_url, @output_dir)
-        download_file(m3u8.main_url, output)
-        m3u8.media_files.each do | file_url |
-          output = file_url.gsub(base_url, @output_dir)
-          download_file(URI.parse(file_url), output)
-        end
-      end
-
-      media_files.each do | file_url |
-        output = file_url.gsub(base_url, @output_dir)
-        download_file(URI.parse(file_url), output)
       end
     end
 
@@ -131,15 +138,11 @@ module HLSDownload
       resp.body
     end
 
-    def sanitise(arr_path)
-      arr_path.reject { |i| i.nil? || i.empty? }
-    end
-
     def is_media_playlist?(man)
       MEDIA_FORMAT_EXTENSIONS.each do |ext|
         return true if man.include? ext
       end
-      return false
+      false
     end
 
     def new_logger
