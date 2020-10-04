@@ -126,7 +126,7 @@ module HLSDownload
       end
       resp = nil
       Net::HTTP.start(url.host) do |http|
-        resp = http.get(url.path)
+        resp = http.get("#{url.path}?#{url.query}")
         if ['4', '5'].include? resp.code[0]
           raise HLSException.new("#{url} response status code: #{resp.code}")
         end
