@@ -24,7 +24,6 @@ module HLSDownload
 
     def initialize(url, logger = nil)
       @logger = logger || new_logger
-      raise HLSException.new("invalid url '#{url}'") unless url.end_with? '.m3u8'
       @main_url = URI.parse(url)
       @media_files = []
       @sub_m3u8 = []
