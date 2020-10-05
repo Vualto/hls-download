@@ -14,3 +14,8 @@ hls_stream.download! output_dir: '/var/www/hls/mystream'
 #### Docker
 
 https://hub.docker.com/r/vualto/hls-download
+
+#### TODO:
+
+- support iframe playlists
+- download recursively
