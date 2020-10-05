@@ -203,7 +203,7 @@ module HLSDownload
 
     def new_logger
       l = Logger.new STDOUT
-      l.level = Logger::DEBUG
+      l.level = Logger::ERROR
       l
     end
 
