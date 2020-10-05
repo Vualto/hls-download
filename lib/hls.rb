@@ -55,20 +55,20 @@ module HLSDownload
       sub_m3u8.each do | m3u8 |
         output = nil
         if m3u8.prefix
-          rel_path = File.join(prefix, 'index.m3u8')
+          rel_path = File.join(m3u8.prefix, 'index.m3u8')
           output = File.join(@output_dir, rel_path)
           # rewrite contents
-          main_manifest_contents.gsub!(sub_m3u8.raw_url, rel_path)
+          main_manifest_contents.gsub!(m3u8.raw_url, rel_path)
         else
           output = m3u8.main_url.to_s.gsub(base_url, @output_dir)
         end
         manifest_contents = http_get(m3u8.main_url)
-        m3u8.media_files.each do | media_file, i |
+        m3u8.media_files.each_with_index do | media_file, i |
           media_output = nil
           if m3u8.prefix
             ext = File.extname(media_file.raw.split('?')[0].split('/').last)
-            basename = "#{i}#{ext}"
-            media_output = File.join(@output_dir, prefix, basename)
+            basename = "#{i+1}#{ext}"
+            media_output = File.join(@output_dir, m3u8.prefix, basename)
             # rewrite contents
             manifest_contents.gsub!(media_file.raw, basename)
           else
@@ -126,7 +126,9 @@ module HLSDownload
             uri_res = attribute.gsub('URI=', '').gsub('"', '')
           end
           if is_iframe
-            iframe_m3u8 << uri_res
+            # TODO add support for iframe playlists
+            raise HLSException.new('I-FRAME-STREAM-INF not supported')
+            # @iframe_m3u8 << uri_res
           else
             uris << uri_res
           end
@@ -152,18 +154,19 @@ module HLSDownload
         sub_m3u8 << HLS.new(u, logger, prefix)
       end
 
-      iframe_m3u8 = iframe_m3u8.map do |u|
-        unless u.include? '://'
-          # relative path
-          s_url = url.dup
-          split_path = s_url.dup.path.split('/')
-          split_path[-1] = u
-          path = File.join(split_path)
-          s_url.path = path.start_with?('/') ? path : "/#{path}"
-          u = s_url.to_s
-        end
-        u
-      end
+      # TODO add support for iframe playlists
+      # @iframe_m3u8 = iframe_m3u8.map do |u|
+      #   if u.include? '://'
+      #   else
+      #     # relative path
+      #     s_url = url.dup
+      #     split_path = s_url.dup.path.split('/')
+      #     split_path[-1] = u
+      #     path = File.join(split_path)
+      #     s_url.path = path.start_with?('/') ? path : "/#{path}"
+      #     u = s_url.to_s
+      #   end
+      # end
     end
 
     def http_get(url)
@@ -200,7 +203,7 @@ module HLSDownload
 
     def new_logger
       l = Logger.new STDOUT
-      l.level = Logger::ERROR
+      l.level = Logger::DEBUG
       l
     end
 
