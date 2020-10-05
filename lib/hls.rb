@@ -20,7 +20,7 @@ module HLSDownload
   end
 
   class HLSMediaFile
-    attr_accessor :url, :filename, :raw
+    attr_accessor :url, :index, :raw
 
     def initialize(url, index, raw)
       @url = url
@@ -48,22 +48,41 @@ module HLSDownload
       base_url = main_url.to_s.gsub("/#{manifest_file}", '')
       @output_dir = opts[:output_dir] || 'out'
       FileUtils.mkdir_p @output_dir
-      
-      download_file(main_url, File.join(@output_dir, 'manifest.m3u8'))
+
+      main_manifest_output = File.join(@output_dir, 'manifest.m3u8')
+      main_manifest_contents = http_get(main_url)
       
       sub_m3u8.each do | m3u8 |
-        output = m3u8.main_url.to_s.gsub(base_url, @output_dir)
-        download_file(m3u8.main_url, output)
-        m3u8.media_files.each do | file_url |
-          output = file_url.gsub(base_url, @output_dir)
-          download_file(URI.parse(file_url), output)
+        output = nil
+        if m3u8.prefix
+          rel_path = File.join(prefix, 'index.m3u8')
+          output = File.join(@output_dir, rel_path)
+          # rewrite contents
+          main_manifest_contents.gsub!(sub_m3u8.raw_url, rel_path)
+        else
+          output = m3u8.main_url.to_s.gsub(base_url, @output_dir)
         end
-      end
+        manifest_contents = http_get(m3u8.main_url)
+        m3u8.media_files.each do | media_file, i |
+          media_output = nil
+          if m3u8.prefix
+            ext = File.extname(media_file.raw.split('?')[0].split('/').last)
+            basename = "#{i}#{ext}"
+            media_output = File.join(@output_dir, prefix, basename)
+            # rewrite contents
+            manifest_contents.gsub!(media_file.raw, basename)
+          else
+            media_output = media_file.url.gsub(base_url, @output_dir)
+          end
+          download_file(URI.parse(media_file.url), media_output)
+        end
 
-      media_files.each do | file_url |
-        output = file_url.gsub(base_url, @output_dir)
-        download_file(URI.parse(file_url), output)
+        write(output, manifest_contents)
       end
+      
+      write(main_manifest_output, main_manifest_contents)
+
+      # TODO download recursively. i.e. allow downloading only 1 rendition
     end
 
     private
@@ -167,9 +186,7 @@ module HLSDownload
         if ['4', '5'].include? resp.code[0]
           raise HLSException.new("#{url} response status code: #{resp.code}")
         end
-        open(output, "wb") do |file|
-          file.write(resp.body)
-        end
+        write(output, resp.body)
       end
       resp.body
     end
@@ -185,6 +202,12 @@ module HLSDownload
       l = Logger.new STDOUT
       l.level = Logger::ERROR
       l
+    end
+
+    def write(output, contents)
+      open(output, "wb") do |file|
+        file.write(contents)
+      end
     end
 
   end
