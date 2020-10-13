@@ -97,6 +97,8 @@ module HLSDownload
         raise HLSException.new('unsupported media playlist') unless is_media_playlist? man
         logger.debug 'getting media url(s)'
         files = lines.reject { |l| l.start_with? '#' }
+        files = files.map { |l| l.gsub(' ', '') }
+        files = files.reject { |l| l.empty? }
         files.each_with_index do |f, i|
           raw = f
           unless f.include? '://'
